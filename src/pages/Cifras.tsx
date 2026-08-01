@@ -1,214 +1,405 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { Plus, Search, Video, X, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 
-interface CifrasProps {
-  userProfile: {
-    organization_id: string;
-    role: 'leader' | 'member';
-  };
+export interface Cifra {
+  id: string;
+  titulo: string;
+  artista: string;
+  tom: string;
+  conteudo: string;
+  youtube_url?: string;
+  bpm?: number;
 }
 
-export default function Cifras({ userProfile }: CifrasProps) {
-  const [songs, setSongs] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedSong, setSelectedSong] = useState<any>(null);
+export interface Playlist {
+  id: string;
+  nome: string;
+  cifras_ids: string[];
+}
 
-  // Campos do Formulário
-  const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
-  const [key, setKey] = useState('');
-  const [bpm, setBpm] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [content, setContent] = useState('');
+interface CifrasProps {
+  cifras: Cifra[];
+  playlists: Playlist[];
+  onAdicionarCifra: (novaCifra: Omit<Cifra, 'id'>) => void;
+  onAtualizarCifra?: (cifraAtualizada: Cifra) => void;
+  onExcluirCifra?: (id: string) => void;
+  onSalvarPlaylist: (nome: string, cifrasIds: string[]) => void;
+  onIrParaPlay: (cifrasSelecionadas: Cifra[]) => void;
+  onSairConta?: () => void;
+}
 
-  useEffect(() => {
-    fetchSongs();
-  }, []);
+export default function Cifras({ 
+  cifras, 
+  playlists, 
+  onAdicionarCifra, 
+  onAtualizarCifra, 
+  onExcluirCifra, 
+  onSalvarPlaylist, 
+  onIrParaPlay, 
+  onSairConta 
+}: CifrasProps) {
+  const [idEditando, setIdEditando] = useState<string | null>(null);
+  const [titulo, setTitulo] = useState(() => localStorage.getItem('rascunho_titulo') || '');
+  const [artista, setArtista] = useState(() => localStorage.getItem('rascunho_artista') || '');
+  const [tom, setTom] = useState(() => localStorage.getItem('rascunho_tom') || '');
+  const [conteudo, setConteudo] = useState(() => localStorage.getItem('rascunho_conteudo') || '');
+  const [youtubeUrl, setYoutubeUrl] = useState(() => localStorage.getItem('rascunho_youtubeUrl') || '');
+  const [bpm, setBpm] = useState<number | ''>(() => {
+    const salvo = localStorage.getItem('rascunho_bpm');
+    return salvo ? Number(salvo) : '';
+  });
 
-  async function fetchSongs() {
-    try {
-      setLoading(true);
-      const { data } = await supabase
-        .from('chord_sheets')
-        .select('*')
-        .eq('organization_id', userProfile.organization_id)
-        .order('title', { ascending: true });
+  useEffect(() => { if (!idEditando) localStorage.setItem('rascunho_titulo', titulo); }, [titulo, idEditando]);
+  useEffect(() => { if (!idEditando) localStorage.setItem('rascunho_artista', artista); }, [artista, idEditando]);
+  useEffect(() => { if (!idEditando) localStorage.setItem('rascunho_tom', tom); }, [tom, idEditando]);
+  useEffect(() => { if (!idEditando) localStorage.setItem('rascunho_conteudo', conteudo); }, [conteudo, idEditando]);
+  useEffect(() => { if (!idEditando) localStorage.setItem('rascunho_youtubeUrl', youtubeUrl); }, [youtubeUrl, idEditando]);
+  useEffect(() => { if (!idEditando) localStorage.setItem('rascunho_bpm', bpm.toString()); }, [bpm, idEditando]);
 
-      if (data) setSongs(data);
-    } catch (error) {
-      console.error('Erro ao buscar músicas:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [selecionadas, setSelecionadas] = useState<string[]>([]);
+  const [nomePlaylist, setNomePlaylist] = useState('');
+  const [buscaRepertorio, setBuscaRepertorio] = useState('');
+  const [abaAtiva, setAbaAtiva] = useState<'gerenciar' | 'repertorio' | 'playlists'>('gerenciar');
 
-  async function handleCreateSong(e: React.FormEvent) {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !artist || !key || !content) return;
+    if (!titulo || !artista || !conteudo) return;
 
-    const { error } = await supabase
-      .from('chord_sheets')
-      .insert([{
-        organization_id: userProfile.organization_id,
-        title,
-        artist,
-        key,
-        bpm: bpm ? parseInt(bpm) : null,
-        video_url: videoUrl,
-        content
-      }]);
-
-    if (!error) {
-      setTitle('');
-      setArtist('');
-      setKey('');
-      setBpm('');
-      setVideoUrl('');
-      setContent('');
-      setShowModal(false);
-      fetchSongs();
+    if (idEditando) {
+      if (onAtualizarCifra) {
+        onAtualizarCifra({
+          id: idEditando,
+          titulo,
+          artista,
+          tom,
+          conteudo,
+          youtube_url: youtubeUrl,
+          bpm: bpm ? Number(bpm) : undefined,
+        });
+      }
+      alert('Cifra atualizada com sucesso!');
+      setIdEditando(null);
     } else {
-      console.error('Erro ao salvar música:', error);
+      onAdicionarCifra({
+        titulo,
+        artista,
+        tom,
+        conteudo,
+        youtube_url: youtubeUrl,
+        bpm: bpm ? Number(bpm) : undefined,
+      });
+      alert('Cifra salva com sucesso!');
     }
-  }
 
-  const filteredSongs = songs.filter(song => 
-    song.title.toLowerCase().includes(search.toLowerCase()) ||
-    song.artist.toLowerCase().includes(search.toLowerCase())
+    setTitulo('');
+    setArtista('');
+    setTom('');
+    setConteudo('');
+    setYoutubeUrl('');
+    setBpm('');
+    localStorage.removeItem('rascunho_titulo');
+    localStorage.removeItem('rascunho_artista');
+    localStorage.removeItem('rascunho_tom');
+    localStorage.removeItem('rascunho_conteudo');
+    localStorage.removeItem('rascunho_youtubeUrl');
+    localStorage.removeItem('rascunho_bpm');
+  };
+
+  const iniciarEdicao = (c: Cifra, e: React.MouseEvent) => {
+    e.stopPropagation(); // Evita marcar a checkbox ao clicar em editar
+    setIdEditando(c.id);
+    setTitulo(c.titulo);
+    setArtista(c.artista);
+    setTom(c.tom || '');
+    setConteudo(c.conteudo);
+    setYoutubeUrl(c.youtube_url || '');
+    setBpm(c.bpm !== undefined ? c.bpm : '');
+    setAbaAtiva('gerenciar');
+  };
+
+  const excluirCifraItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Tem certeza que deseja excluir esta cifra?')) {
+      if (onExcluirCifra) {
+        onExcluirCifra(id);
+      }
+      setSelecionadas(selecionadas.filter(s => s !== id));
+    }
+  };
+
+  const toggleSelecionada = (id: string) => {
+    if (selecionadas.includes(id)) {
+      setSelecionadas(selecionadas.filter(item => item !== id));
+    } else {
+      setSelecionadas([...selecionadas, id]);
+    }
+  };
+
+  const iniciarModoPlayComSelecao = () => {
+    if (selecionadas.length === 0) {
+      alert('Selecione pelo menos uma música para tocar!');
+      return;
+    }
+    const cifrasParaTocar = cifras.filter(c => selecionadas.map(String).includes(String(c.id)));
+    
+    if (cifrasParaTocar.length === 0) {
+      alert('Erro: As músicas selecionadas não foram encontradas na lista.');
+      return;
+    }
+
+    onIrParaPlay(cifrasParaTocar);
+  };
+
+  const carregarPlaylist = (playlist: Playlist) => {
+    const cifrasDaPlaylist = cifras.filter(c => playlist.cifras_ids.map(String).includes(String(c.id)));
+    if (cifrasDaPlaylist.length === 0) {
+      alert('Esta playlist não possui músicas válidas.');
+      return;
+    }
+    onIrParaPlay(cifrasDaPlaylist);
+  };
+
+  const salvarNovaPlaylist = () => {
+    if (!nomePlaylist.trim()) {
+      alert('Digite um nome para a playlist.');
+      return;
+    }
+    if (selecionadas.length === 0) {
+      alert('Selecione pelo menos uma música para a playlist.');
+      return;
+    }
+    onSalvarPlaylist(nomePlaylist, selecionadas);
+    setNomePlaylist('');
+    alert('Playlist salva com sucesso!');
+  };
+
+  const cifrasFiltradas = cifras.filter(c => 
+    c.titulo.toLowerCase().includes(buscaRepertorio.toLowerCase()) ||
+    c.artista.toLowerCase().includes(buscaRepertorio.toLowerCase())
   );
 
   return (
-    <div style={{ padding: '24px', color: '#f4f4f5', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-      
-      {/* Cabeçalho da Tela */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 4px 0' }}>Acervo de Cifras</h1>
-          <p style={{ fontSize: '14px', color: '#a1a1aa', margin: 0 }}>Repositório de músicas oficiais do ministério.</p>
-        </div>
-        {userProfile.role === 'leader' && (
-          <button onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#7c3aed', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
-            <Plus style={{ width: '18px', height: '18px' }} /> Nova Música
-          </button>
-        )}
-      </div>
+    <div style={{ minHeight: '100vh', background: '#0f172a', color: '#fff', padding: '30px 20px', fontFamily: 'sans-serif' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        
+        {/* Cabeçalho, Abas e Botão Sair */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '15px' }}>
+          <div>
+            <h1 style={{ margin: 0, color: '#38bdf8' }}>LouvorFlow - Gestão de Cifras</h1>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              onClick={() => { setIdEditando(null); setAbaAtiva('gerenciar'); }} 
+              style={{ background: abaAtiva === 'gerenciar' ? '#3b82f6' : '#1e293b', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              {idEditando ? '✏️ Editando Cifra' : '+ Nova Cifra'}
+            </button>
+            <button 
+              onClick={() => setAbaAtiva('repertorio')} 
+              style={{ background: abaAtiva === 'repertorio' ? '#3b82f6' : '#1e293b', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              🎵 Selecionar Repertório
+            </button>
+            <button 
+              onClick={() => setAbaAtiva('playlists')} 
+              style={{ background: abaAtiva === 'playlists' ? '#3b82f6' : '#1e293b', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              📂 Playlists Salvas
+            </button>
 
-      {/* Barra de Pesquisa */}
-      <div style={{ position: 'relative', marginBottom: '20px' }}>
-        <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa', width: '18px', height: '18px' }} />
-        <input 
-          type="text" 
-          placeholder="Buscar por título ou artista..." 
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '12px 12px 12px 42px', color: '#fff', fontSize: '14px' }}
-        />
-      </div>
-
-      {/* Grid de Músicas */}
-      {loading ? (
-        <p style={{ color: '#a1a1aa' }}>Carregando acervo...</p>
-      ) : filteredSongs.length === 0 ? (
-        <p style={{ color: '#a1a1aa' }}>Nenhuma música encontrada.</p>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-          {filteredSongs.map(song => (
-            <div key={song.id} style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 4px 0' }}>{song.title}</h3>
-                <p style={{ fontSize: '13px', color: '#a1a1aa', margin: '0 0 12px 0' }}>{song.artist}</p>
-                
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '12px', backgroundColor: '#27272a', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', color: '#a78bfa' }}>Tom: {song.key}</span>
-                  {song.bpm && <span style={{ fontSize: '12px', backgroundColor: '#27272a', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold', color: '#10b981' }}>BPM: {song.bpm}</span>}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setSelectedSong(song)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#27272a', border: '1px solid #3f3f46', color: '#fff', padding: '8px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
-                  <FileText style={{ width: '14px', height: '14px' }} /> Ver Cifra
-                </button>
-                {song.video_url && (
-                  <a href={song.video_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ef4444', padding: '8px', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', fontWeight: 'bold' }}>
-                    <Video style={{ width: '14px', height: '14px' }} /> Vídeo
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* MODAL DE VISUALIZAÇÃO DA CIFRA */}
-      {selectedSong && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 100 }}>
-          <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', padding: '24px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px', borderBottom: '1px solid #27272a', paddingBottom: '12px' }}>
-              <div>
-                <h2 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 4px 0' }}>{selectedSong.title}</h2>
-                <p style={{ fontSize: '14px', color: '#a1a1aa', margin: 0 }}>{selectedSong.artist} | Tom: <strong>{selectedSong.key}</strong> {selectedSong.bpm ? `| BPM: ${selectedSong.bpm}` : ''}</p>
-              </div>
-              <X onClick={() => setSelectedSong(null)} style={{ cursor: 'pointer', color: '#a1a1aa' }} />
-            </div>
-            
-            {/* Corpo da Cifra com espaçamento monoespaçado */}
-            <pre style={{ backgroundColor: '#09090b', padding: '16px', borderRadius: '8px', border: '1px solid #27272a', overflowX: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '15px', color: '#e4e4e7', lineHeight: '1.6', margin: 0 }}>
-              {selectedSong.content}
-            </pre>
+            {onSairConta && (
+              <button 
+                onClick={onSairConta} 
+                style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                title="Sair da Conta"
+              >
+                Sair
+              </button>
+            )}
           </div>
         </div>
-      )}
 
-      {/* MODAL DE CRIAÇÃO (LÍDER) */}
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 100 }}>
-          <form onSubmit={handleCreateSong} style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', padding: '24px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* ABA 1: CADASTRAR / EDITAR NOVA CIFRA */}
+        <div style={{ display: abaAtiva === 'gerenciar' ? 'block' : 'none' }}>
+          <form onSubmit={handleSubmit} style={{ background: '#1e293b', padding: '25px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>Adicionar Nova Música</h2>
-              <X onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: '#a1a1aa' }} />
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '20px' }}>
+                {idEditando ? 'Editar Cifra' : 'Cadastrar Nova Cifra'}
+              </h2>
+              {idEditando && (
+                <button 
+                  type="button" 
+                  onClick={() => { setIdEditando(null); setTitulo(''); setArtista(''); setTom(''); setConteudo(''); setYoutubeUrl(''); setBpm(''); }} 
+                  style={{ background: '#334155', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                >
+                  Cancelar Edição
+                </button>
+              )}
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#a1a1aa', marginBottom: '4px' }}>TÍTULO</label>
-                <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ex: Hosana" style={{ width: '100%', boxSizing: 'border-box', backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '10px', color: '#fff' }} />
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '15px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '14px', color: '#94a3b8' }}>Título da Música</label>
+                <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }} />
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#a1a1aa', marginBottom: '4px' }}>ARTISTA / MINISTÉRIO</label>
-                <input type="text" value={artist} onChange={e => setArtist(e.target.value)} required placeholder="Ex: Morada" style={{ width: '100%', boxSizing: 'border-box', backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '10px', color: '#fff' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '14px', color: '#94a3b8' }}>Artista / Ministério</label>
+                <input type="text" value={artista} onChange={e => setArtista(e.target.value)} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '14px', color: '#94a3b8' }}>Tom</label>
+                <input type="text" value={tom} onChange={e => setTom(e.target.value)} placeholder="Ex: G, D/F#" style={{ padding: '10px', borderRadius: '6px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }} />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#a1a1aa', marginBottom: '4px' }}>TOM (KEY)</label>
-                <input type="text" value={key} onChange={e => setKey(e.target.value)} required placeholder="Ex: G, E, C#m" style={{ width: '100%', boxSizing: 'border-box', backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '10px', color: '#fff' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px', gap: '15px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '14px', color: '#94a3b8' }}>Link do YouTube (Opcional)</label>
+                <input type="url" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." style={{ padding: '10px', borderRadius: '6px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }} />
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#a1a1aa', marginBottom: '4px' }}>BPM (OPCIONAL)</label>
-                <input type="number" value={bpm} onChange={e => setBpm(e.target.value)} placeholder="Ex: 120" style={{ width: '100%', boxSizing: 'border-box', backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '10px', color: '#fff' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '14px', color: '#94a3b8' }}>BPM (Andamento)</label>
+                <input type="number" value={bpm} onChange={e => setBpm(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Ex: 72" style={{ padding: '10px', borderRadius: '6px', border: '1px solid #334155', background: '#0f172a', color: '#fff' }} />
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#a1a1aa', marginBottom: '4px' }}>LINK DO VÍDEO / REFERÊNCIA (OPCIONAL)</label>
-              <input type="url" value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." style={{ width: '100%', boxSizing: 'border-box', backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '10px', color: '#fff' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={{ fontSize: '14px', color: '#94a3b8' }}>Conteúdo da Cifra (com os acordes nas linhas acima da letra)</label>
+              <textarea value={conteudo} onChange={e => setConteudo(e.target.value)} rows={10} required placeholder="A&#10;Tem ciúmes de mim&#10;D/F#&#10;O Seu amor é como um furacão" style={{ padding: '10px', borderRadius: '6px', border: '1px solid #334155', background: '#0f172a', color: '#fff', fontFamily: 'monospace', fontSize: '15px' }} />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#a1a1aa', marginBottom: '4px' }}>LETRA E CIFRA</label>
-              <textarea value={content} onChange={e => setContent(e.target.value)} required placeholder="Cole aqui a letra junto com as cifras espaciais..." style={{ width: '100%', boxSizing: 'border-box', backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '12px', color: '#fff', height: '18px', minHeight: '180px', fontFamily: 'monospace', resize: 'vertical' }} />
-            </div>
-
-            <button type="submit" style={{ backgroundColor: '#7c3aed', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', marginTop: '4px' }}>
-              Salvar Música no Acervo
+            <button type="submit" style={{ background: idEditando ? '#3b82f6' : '#10b981', color: '#fff', border: 'none', padding: '12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer', marginTop: '10px' }}>
+              {idEditando ? 'Atualizar Cifra' : 'Salvar Cifra no Banco'}
             </button>
           </form>
         </div>
-      )}
+
+        {/* ABA 2: SELECIONAR REPERTÓRIO */}
+        <div style={{ display: abaAtiva === 'repertorio' ? 'block' : 'none' }}>
+          <div style={{ background: '#1e293b', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+              <div>
+                <h2 style={{ margin: '0 0 5px 0' }}>Montar Repertório para o Ensaio/Culto</h2>
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>Selecione as músicas que deseja tocar hoje:</p>
+              </div>
+
+              <button 
+                onClick={iniciarModoPlayComSelecao}
+                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                🚀 Iniciar Modo Play ({selecionadas.length})
+              </button>
+            </div>
+
+            {/* Barra de Busca / Filtro de Músicas */}
+            <div style={{ marginBottom: '15px' }}>
+              <input 
+                type="text" 
+                placeholder="🔍 Filtrar música por título ou artista..." 
+                value={buscaRepertorio} 
+                onChange={e => setBuscaRepertorio(e.target.value)}
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #334155', background: '#0f172a', color: '#fff', fontSize: '15px', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: '#0f172a', padding: '15px', borderRadius: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input 
+                type="text" 
+                placeholder="Nome da Playlist (Ex: Culto Domingo Noite)" 
+                value={nomePlaylist} 
+                onChange={e => setNomePlaylist(e.target.value)}
+                style={{ flex: 1, minWidth: '220px', padding: '10px', borderRadius: '6px', border: '1px solid #334155', background: '#1e293b', color: '#fff' }}
+              />
+              <button 
+                onClick={salvarNovaPlaylist}
+                style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                💾 Salvar como Playlist
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
+              {cifrasFiltradas.length === 0 ? (
+                <p style={{ color: '#94a3b8', textAlign: 'center' }}>Nenhuma música encontrada com esse termo.</p>
+              ) : (
+                cifrasFiltradas.map(c => {
+                  const isChecked = selecionadas.includes(c.id);
+                  return (
+                    <div 
+                      key={c.id} 
+                      onClick={() => toggleSelecionada(c.id)}
+                      style={{ background: isChecked ? '#1e3a8a' : '#0f172a', border: `1px solid ${isChecked ? '#3b82f6' : '#334155'}`, padding: '12px 15px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                        <div>
+                          <h4 style={{ margin: '0 0 3px 0', fontSize: '16px' }}>{c.titulo}</h4>
+                          <span style={{ fontSize: '13px', color: '#94a3b8' }}>{c.artista} {c.bpm ? `• ${c.bpm} BPM` : ''}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ background: '#334155', padding: '4px 10px', borderRadius: '6px', fontSize: '13px', color: '#f59e0b', fontWeight: 'bold' }}>
+                          Tom: {c.tom || 'N/D'}
+                        </span>
+                        
+                        <button 
+                          onClick={(e) => iniciarEdicao(c, e)} 
+                          style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                          title="Editar Cifra"
+                        >
+                          ✏️
+                        </button>
+                        
+                        <button 
+                          onClick={(e) => excluirCifraItem(c.id, e)} 
+                          style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                          title="Excluir Cifra"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ABA 3: PLAYLISTS SALVAS */}
+        <div style={{ display: abaAtiva === 'playlists' ? 'block' : 'none' }}>
+          <div style={{ background: '#1e293b', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ margin: '0 0 5px 0' }}>Suas Playlists Salvas</h2>
+            <p style={{ margin: '0 0 20px 0', color: '#94a3b8', fontSize: '14px' }}>Carregue um setlist salvo anteriormente com um clique:</p>
+
+            <div style={{ display: 'grid', gap: '15px' }}>
+              {playlists.length === 0 ? (
+                <p style={{ color: '#94a3b8', textAlign: 'center' }}>Nenhuma playlist salva. Vá em "Selecionar Repertório" e salve sua primeira playlist!</p>
+              ) : (
+                playlists.map(pl => {
+                  const qtdMusicas = pl.cifras_ids.length;
+                  return (
+                    <div key={pl.id} style={{ background: '#0f172a', padding: '15px', borderRadius: '8px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <h3 style={{ margin: '0 0 5px 0', color: '#38bdf8' }}>{pl.nome}</h3>
+                        <span style={{ fontSize: '13px', color: '#94a3b8' }}>{qtdMusicas} música(s) no setlist</span>
+                      </div>
+                      <button 
+                        onClick={() => carregarPlaylist(pl)}
+                        style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        ▶ Tocar Playlist
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
