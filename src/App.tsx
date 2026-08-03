@@ -164,7 +164,7 @@ export default function App() {
           onIrParaPlay={handleIrParaPlay}
           onSairConta={handleSairConta}
         />
-      ) : (
+      ) : ( 
         <Play
           cifrasParaTocar={cifrasParaTocar}
           onVoltar={() => setTelaAtual('gerenciar')}

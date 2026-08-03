@@ -43,7 +43,7 @@ export const storageService = {
         localStorage.setItem(CACHE_KEY, JSON.stringify(novoCache));
         return data[0];
       }
-    } catch (err) {
+    } catch (err) { 
       console.warn('Você está offline. A cifra foi salva apenas localmente.');
       
       const itemOffline = { ...dadosParaSalvar, id: 'offline_' + Date.now() };
