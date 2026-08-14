@@ -1,9 +1,9 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 const BASE_URL = 'https://www.cifraclub.com.br';
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -15,11 +15,11 @@ export default async function handler(req, res) {
   const { slug } = req.query;
 
   if (!slug) {
-    return res.status(400).json({ erro: 'Slug do artista é obrigatório.' });
+    return res.status(400).json({ erro: 'Slug do artista e obrigatorio.' });
   }
 
   try {
-    const { data: html } = await axios.get(`${BASE_URL}/${slug}/musicas.html`, {
+    const response = await axios.get(BASE_URL + '/' + slug + '/musicas.html', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml',
@@ -28,28 +28,28 @@ export default async function handler(req, res) {
       timeout: 15000,
     });
 
-    const $ = cheerio.load(html);
+    const $ = cheerio.load(response.data);
     const musicas = [];
+    const hrefPattern = new RegExp('^/' + slug + '/[^/]+/$');
 
-    const hrefPattern = new RegExp(`^/${slug}/[^/]+/$`);
-    $('a[href]').each((i, el) => {
-      const href = $(el).attr('href');
+    $('a[href]').each(function () {
+      const href = $(this).attr('href');
       if (href && hrefPattern.test(href)) {
-        const titulo = $(el).text().trim().replace(/^\d+/, '');
+        const titulo = $(this).text().trim().replace(/^\d+/, '');
         if (titulo) {
-          const songSlug = href.replace(`/${slug}/`, '').replace(/\//g, '');
+          const songSlug = href.replace('/' + slug + '/', '').replace(/\//g, '');
           musicas.push({
-            titulo,
+            titulo: titulo,
             slug: songSlug,
-            url: `${BASE_URL}${href}`,
+            url: BASE_URL + href,
           });
         }
       }
     });
 
-    return res.status(200).json({ musicas });
+    return res.status(200).json({ musicas: musicas });
   } catch (error) {
-    console.error(`Erro ao buscar músicas de ${slug}:`, error.message);
-    return res.status(500).json({ erro: 'Erro ao buscar músicas do artista.' });
+    console.error('Erro ao buscar musicas de ' + slug + ':', error.message);
+    return res.status(500).json({ erro: 'Erro ao buscar musicas do artista.' });
   }
-}
+};
