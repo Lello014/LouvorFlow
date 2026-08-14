@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BuscarCifraClub from './BuscarCifraClub';
 
 export interface Cifra {
   id: string;
@@ -58,7 +59,7 @@ export default function Cifras({
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const [nomePlaylist, setNomePlaylist] = useState('');
   const [buscaRepertorio, setBuscaRepertorio] = useState('');
-  const [abaAtiva, setAbaAtiva] = useState<'gerenciar' | 'repertorio' | 'playlists'>('gerenciar');
+  const [abaAtiva, setAbaAtiva] = useState<'gerenciar' | 'repertorio' | 'playlists' | 'buscar'>('gerenciar');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,6 +206,12 @@ export default function Cifras({
               style={{ background: abaAtiva === 'playlists' ? '#3b82f6' : '#1e293b', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               📂 Playlists Salvas
+            </button>
+            <button 
+              onClick={() => setAbaAtiva('buscar')} 
+              style={{ background: abaAtiva === 'buscar' ? '#f59e0b' : '#1e293b', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              🔍 Buscar Cifras
             </button>
 
             {onSairConta && (
@@ -397,6 +404,21 @@ export default function Cifras({
               )}
             </div>
           </div>
+        </div>
+
+        {/* ABA 4: BUSCAR CIFRAS NO CIFRA CLUB */}
+        <div style={{ display: abaAtiva === 'buscar' ? 'block' : 'none' }}>
+          <BuscarCifraClub
+            onImportarCifra={(cifra) => {
+              onAdicionarCifra({
+                titulo: cifra.titulo,
+                artista: cifra.artista,
+                tom: cifra.tom,
+                conteudo: cifra.conteudo,
+                youtube_url: cifra.youtube_url,
+              });
+            }}
+          />
         </div>
 
       </div>

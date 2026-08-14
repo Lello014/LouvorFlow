@@ -1,0 +1,225 @@
+import express from 'express';
+import cors from 'cors';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json());
+
+const BASE_URL = 'https://www.cifraclub.com.br';
+
+const ARTISTAS_POPULARES = [
+  { nome: 'Diante do Trono', slug: 'diante-do-trono' },
+  { nome: 'Aline Barros', slug: 'aline-barros' },
+  { nome: 'Fernandinho', slug: 'fernandinho' },
+  { nome: 'Nívea Soares', slug: 'nivea-soares' },
+  { nome: 'Gabriela Rocha', slug: 'gabriela-rocha' },
+  { nome: 'Isaías Saad', slug: 'isaias-saad' },
+  { nome: 'Anderson Freire', slug: 'anderson-freire' },
+  { nome: 'Thalles Roberto', slug: 'thalles-roberto' },
+  { nome: 'Agnaldo Timóteo', slug: 'agnaldo-timoteo' },
+  { nome: 'Kleber Lucas', slug: 'kleber-lucas' },
+  { nome: 'Robson Siqueira', slug: 'robson-siqueira' },
+  { nome: 'Rozeane Ribeiro', slug: 'rozeane-ribeiro' },
+  { nome: 'Eyshila', slug: 'eyshila' },
+  { nome: 'Cassiane', slug: 'cassiane' },
+  { nome: 'Toque no Altar', slug: 'toque-no-altar' },
+  { nome: 'Ministério Apascentar', slug: 'ministerio-apascentar' },
+  { nome: 'Quatro por Um', slug: 'quatro-por-um' },
+  { nome: 'Voz da Verdade', slug: 'voz-da-verdade' },
+  { nome: 'Bruno e Marrone', slug: 'bruno-e-marrone' },
+  { nome: 'Zezinho Corrêa', slug: 'zezinho-correa' },
+  { nome: 'Marcelo Aguiar', slug: 'marcelo-aguiar' },
+  { nome: 'Regis Danese', slug: 'regis-danese' },
+  { nome: 'Eduardo Costa', slug: 'eduardo-costa' },
+  { nome: 'Trazendo a Arca', slug: 'trazendo-a-arca' },
+  { nome: 'Lazarus', slug: 'lazarus' },
+  { nome: 'Averlane', slug: 'averlane' },
+  { nome: 'Graziela Brazil', slug: 'graziela-brazil' },
+  { nome: 'Joaby Lira', slug: 'joaby-lira' },
+  { nome: 'Delino Marçal', slug: 'delino-marcal' },
+  { nome: 'Léa Mendonça', slug: 'lea-mendonca' },
+  { nome: 'Jamily', slug: 'jamily' },
+  { nome: 'Terciana', slug: 'terciana' },
+  { nome: 'Soraya Moraes', slug: 'soraya-moraes' },
+  { nome: 'Darlene', slug: 'darlene' },
+  { nome: 'Jenifer Moreira', slug: 'jenifer-moreira' },
+  { nome: 'Paula Lima', slug: 'paula-lima' },
+  { nome: 'Chris Durán', slug: 'chris-duran' },
+  { nome: 'Marina de Medeiros', slug: 'marina-de-medeiros' },
+  { nome: 'Soraya Moraes', slug: 'soraya-moraes' },
+  { nome: 'Anderson Lima', slug: 'anderson-lima' },
+  { nome: 'Paulo César Baruk', slug: 'paulo-cesar-baruk' },
+  { nome: 'Diante da Cruz', slug: 'diante-da-cruz' },
+  { nome: 'Ministério Louvor Eterno', slug: 'ministerio-louvor-eterno' },
+  { nome: 'Adriana', slug: 'adriana' },
+  { nome: 'Fernanda Brum', slug: 'fernanda-brum' },
+  { nome: 'Clédi Almeida', slug: 'cledi-almeida' },
+  { nome: 'Nívea Soares', slug: 'nivea-soares' },
+  { nome: 'Ludmila Ferber', slug: 'ludmila-ferber' },
+  { nome: 'Beth Carvalho', slug: 'beth-carvalho' },
+  { nome: 'Oficina G3', slug: 'oficina-g3' },
+  { nome: 'Renascer Praise', slug: 'renascer-praise' },
+];
+
+async function buscarMusicasArtista(slug) {
+  try {
+    const { data: html } = await axios.get(`${BASE_URL}/${slug}/musicas.html`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+      },
+      timeout: 15000,
+    });
+
+    const $ = cheerio.load(html);
+    const musicas = [];
+
+    const hrefPattern = new RegExp(`^/${slug}/[^/]+/$`);
+    $(`a[href]`).each((i, el) => {
+      const href = $(el).attr('href');
+      if (href && hrefPattern.test(href)) {
+        const titulo = $(el).text().trim().replace(/^\d+/, '');
+        if (titulo) {
+          const songSlug = href.replace(`/${slug}/`, '').replace(/\//g, '');
+          musicas.push({
+            titulo,
+            slug: songSlug,
+            url: `${BASE_URL}${href}`,
+          });
+        }
+      }
+    });
+
+    return musicas;
+  } catch (error) {
+    console.error(`Erro ao buscar músicas de ${slug}:`, error.message);
+    return [];
+  }
+}
+
+async function buscarCifraCompleta(url) {
+  try {
+    const { data: html } = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+      },
+      timeout: 15000,
+    });
+
+    const $ = cheerio.load(html);
+
+    const titulo = $('h1').first().text().trim();
+    
+    let artista = '';
+    const artistaElement = $('h2').filter(function() {
+      return !$(this).text().includes('Menu') && !$(this).text().includes('menu');
+    }).first();
+    if (artistaElement.length) {
+      artista = artistaElement.text().trim();
+    }
+
+    let conteudo = '';
+    const preElement = $('pre');
+    if (preElement.length) {
+      conteudo = preElement.first().text();
+    }
+
+    let tom = '';
+    const tomElement = $('.cifra_tuning, .tuning .key');
+    if (tomElement.length) {
+      tom = tomElement.text().trim();
+    }
+
+    let youtubeUrl = '';
+    const youtubeLink = $('a[href*="youtube.com"], a[href*="youtu.be"]');
+    if (youtubeLink.length) {
+      youtubeUrl = youtubeLink.first().attr('href');
+    }
+
+    return {
+      titulo,
+      artista,
+      tom,
+      conteudo,
+      youtube_url: youtubeUrl,
+      url_original: url,
+    };
+  } catch (error) {
+    console.error('Erro ao buscar cifra:', error.message);
+    return null;
+  }
+}
+
+app.get('/api/artistas', (req, res) => {
+  res.json({ artistas: ARTISTAS_POPULARES });
+});
+
+app.get('/api/artistas/buscar', (req, res) => {
+  const { q } = req.query;
+  if (!q) {
+    return res.json({ artistas: ARTISTAS_POPULARES });
+  }
+
+  const termo = q.toLowerCase();
+  const filtrados = ARTISTAS_POPULARES.filter(a =>
+    a.nome.toLowerCase().includes(termo)
+  );
+
+  res.json({ artistas: filtrados });
+});
+
+app.get('/api/artistas/:slug/musicas', async (req, res) => {
+  const { slug } = req.params;
+
+  try {
+    const musicas = await buscarMusicasArtista(slug);
+    res.json({ musicas });
+  } catch (error) {
+    res.status(500).json({ erro: 'Erro ao buscar músicas do artista.' });
+  }
+});
+
+app.get('/api/cifra', async (req, res) => {
+  const { url } = req.query;
+  if (!url) {
+    return res.status(400).json({ erro: 'Parâmetro "url" é obrigatório.' });
+  }
+
+  try {
+    const cifra = await buscarCifraCompleta(url);
+    if (cifra && cifra.conteudo) {
+      res.json(cifra);
+    } else {
+      res.status(404).json({ erro: 'Cifra não encontrada.' });
+    }
+  } catch (error) {
+    res.status(500).json({ erro: 'Erro ao buscar cifra.' });
+  }
+});
+
+app.get('/api/cifra/:artist/:song', async (req, res) => {
+  const { artist, song } = req.params;
+
+  try {
+    const url = `${BASE_URL}/${artist}/${song}/`;
+    const cifra = await buscarCifraCompleta(url);
+    if (cifra && cifra.conteudo) {
+      res.json(cifra);
+    } else {
+      res.status(404).json({ erro: 'Cifra não encontrada.' });
+    }
+  } catch (error) {
+    res.status(500).json({ erro: 'Erro ao buscar cifra.' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`LouvorFlow API rodando em http://localhost:${PORT}`);
+});
