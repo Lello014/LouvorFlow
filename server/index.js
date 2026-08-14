@@ -158,25 +158,23 @@ async function buscarCifraCompleta(url) {
 }
 
 app.get('/api/artistas', (req, res) => {
+  const { q } = req.query;
+  if (q) {
+    const termo = q.toLowerCase();
+    const filtrados = ARTISTAS_POPULARES.filter(a =>
+      a.nome.toLowerCase().includes(termo)
+    );
+    return res.json({ artistas: filtrados });
+  }
   res.json({ artistas: ARTISTAS_POPULARES });
 });
 
-app.get('/api/artistas/buscar', (req, res) => {
-  const { q } = req.query;
-  if (!q) {
-    return res.json({ artistas: ARTISTAS_POPULARES });
+app.get('/api/musicas', async (req, res) => {
+  const { slug } = req.query;
+
+  if (!slug) {
+    return res.status(400).json({ erro: 'Slug do artista é obrigatório.' });
   }
-
-  const termo = q.toLowerCase();
-  const filtrados = ARTISTAS_POPULARES.filter(a =>
-    a.nome.toLowerCase().includes(termo)
-  );
-
-  res.json({ artistas: filtrados });
-});
-
-app.get('/api/artistas/:slug/musicas', async (req, res) => {
-  const { slug } = req.params;
 
   try {
     const musicas = await buscarMusicasArtista(slug);

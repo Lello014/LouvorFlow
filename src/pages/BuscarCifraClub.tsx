@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   buscarArtistas,
   buscarMusicasArtista,
@@ -293,7 +293,7 @@ export default function BuscarCifraClub({ onImportarCifra }: BuscarCifraClubProp
         </div>
       )}
 
-      {!artistaSelecionada && artistas.length === 0 && !carregando && (
+      {!artistaSelecionado && artistas.length === 0 && !carregando && (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
           <p style={{ fontSize: '40px', margin: '0 0 10px 0' }}>🎵</p>
           <p>Nenhum artista encontrado</p>

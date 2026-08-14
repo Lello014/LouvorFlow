@@ -25,7 +25,7 @@ export interface CifraCompleta {
 export async function buscarArtistas(termo?: string): Promise<Artista[]> {
   try {
     const url = termo
-      ? `${API_BASE}/api/artistas/buscar?q=${encodeURIComponent(termo)}`
+      ? `${API_BASE}/api/artistas?q=${encodeURIComponent(termo)}`
       : `${API_BASE}/api/artistas`;
     const response = await fetch(url);
     if (!response.ok) throw new Error('Erro ao buscar artistas');
