@@ -39,7 +39,7 @@ export async function buscarArtistas(termo?: string): Promise<Artista[]> {
 
 export async function buscarMusicasArtista(slug: string): Promise<Musica[]> {
   try {
-    const response = await fetch(`${API_BASE}/api/artistas/${slug}/musicas`);
+    const response = await fetch(`${API_BASE}/api/musicas?slug=${encodeURIComponent(slug)}`);
     if (!response.ok) throw new Error('Erro ao buscar músicas');
     const data = await response.json();
     return data.musicas || [];
